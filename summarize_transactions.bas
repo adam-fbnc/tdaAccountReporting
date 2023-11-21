@@ -15,19 +15,19 @@ Sub transformSheet()
     ActiveSheet.Name = sheetName
     sheetName = "head_" & sheetName
     
-' 2) Go to the cell adjacent to the last column header to the left and a new column header "Amount"
+' 2) Go to the cell adjacent to the last column header to the left and add a new column header "Amount"
 
     Cells.Find(What:="Filled Orders", After:=ActiveCell, LookIn:=xlFormulas2 _
     , LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlNext).Select
 
-    ' 2.a) Add a range name that will be used later on
+    ' 2.a) Add a named range that will be used later on
     ActiveWorkbook.Names.Add Name:=sheetName, RefersTo:=Selection
     ActiveCell.Offset(1, 14).Select
 
     ActiveCell.FormulaR1C1 = "Amount"
 
-' 3) Add formula to calculate transaction amounts. Normally only transaction price and quantity are included
-' and apply the formula down to the last row
+' 3) Add formula to calculate transaction amounts. Normally only transaction price and quantity are included.
+' Apply the formula down to the last row
 
     ActiveCell.Offset(1, 0).Select
     Application.CutCopyMode = False
@@ -39,7 +39,6 @@ Sub transformSheet()
     Range(Selection, Selection.End(xlToRight)).Select
 
 ' 4) Add a PivotTable that summarizes the transactions for the day
-'    Selection.Offset(0, 2).Select
 '
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         Selection, Version:=8).CreatePivotTable _
@@ -92,8 +91,6 @@ Sub transformSheet()
     End With
     ActiveSheet.PivotTables(sheetName).AddDataField ActiveSheet.PivotTables( _
         sheetName).PivotFields("Qty"), "Sum of Qty", xlSum
-    'ActiveSheet.PivotTables(sheetName).AddDataField ActiveSheet.PivotTables( _
-    '    sheetName).PivotFields("Net Price"), "Sum of Net Price", xlSum
     ActiveSheet.PivotTables(sheetName).AddDataField ActiveSheet.PivotTables( _
         sheetName).PivotFields("Amount"), "Sum of Amount", xlSum
     ActiveSheet.PivotTables(sheetName).CalculatedFields.Add "Calc Ave", _
@@ -141,10 +138,10 @@ End Sub
 
 
 Sub addToSummary()
-'
-' addToSummary Macro
+
 '
 ' Keyboard Shortcut: Ctrl+Shift+W
+' Adds newly added sheet data to the "Summary" sheet for aggregation
 
     Dim sheetName, cellAddress As String
     
@@ -178,11 +175,15 @@ Sub updateSummary()
 '
 ' Keyboard Shortcut: Ctrl+Shift+Q
 '
+
+'1) Clear segments that will be updated (eg Pivot Table) and select range with data
     Dim pf As PivotField
     Sheets("Summary").Columns("O:X").Clear
     Sheets("Summary").Range("A5").Select
     Range(Selection, Selection.Offset(0, 12)).Select
     Range(Selection, Selection.End(xlDown)).Select
+
+'2) Add Pivot table
     ActiveWorkbook.PivotCaches.Create(SourceType:=xlDatabase, SourceData:= _
         Selection, Version:=8).CreatePivotTable _
         TableDestination:=ActiveCell.Offset(0, 14), TableName:= _
@@ -235,34 +236,34 @@ Sub updateSummary()
     ActiveSheet.PivotTables("Transactions Summary").AddDataField ActiveSheet.PivotTables( _
         "Transactions Summary").PivotFields("Qty"), "Sum of Qty", xlSum
     ActiveSheet.PivotTables("Transactions Summary").AddDataField ActiveSheet.PivotTables( _
-        "Transactions Summary").PivotFields("Net Price"), "Sum of Net Price", xlSum
-    ActiveSheet.PivotTables("Transactions Summary").AddDataField ActiveSheet.PivotTables( _
         "Transactions Summary").PivotFields("Amount"), "Sum of Amount", xlSum
-    With ActiveSheet.PivotTables("Transactions Summary").PivotFields("Sum of Net Price")
-        .Caption = "Average of Net Price"
-        .Function = xlAverage
-    End With
-    
+    ActiveSheet.PivotTables("Transactions Summary").CalculatedFields.Add "Calc Ave", _
+        "=Amount / ABS(Qty)", True
+    ActiveSheet.PivotTables("Transactions Summary").PivotFields("Calc Ave").Orientation = _
+        xlDataField
+        
     'Changes formatting of Value fields
     For Each pf In ActiveSheet.PivotTables("Transactions Summary").DataFields
         pf.NumberFormat = "#,##0.00_);[Red](#,##0.00)"
     Next pf
     
-    Range("O5").Select
-    Range(Selection, Selection.End(xlDown)).Select
-    Range(Selection, Selection.End(xlToRight)).Select
-    Selection.Copy
-    Range("S5").Select
-    Selection.PasteSpecial Paste:=xlPasteValues, Operation:=xlNone, SkipBlanks _
-        :=False, Transpose:=False
-    Range("W1").Select
-    ActiveCell.FormulaR1C1 = "=MIN(R[1]C[-3],-R[2]C[-3])"
-    ActiveCell.Offset(1, 0).Select
-    ActiveCell.FormulaR1C1 = "=(R[1]C[-5]/R[1]C[-7])-(RC[-5]/RC[-7])"
+    ActiveSheet.Range("S5").Select
+    ActiveCell.FormulaR1C1 = _
+        "=IF(R[-2]C=""CALC"",MIN(R[-1]C[-3],-RC[-3]),IF(R[-1]C=""CALC"",RC[-1]+R[1]C[-1],IF(AND(R[1]C[-4]=""BUY"",R[2]C[-4]=""SELL""),""CALC"","""")))"
+    Selection.AutoFill Destination:=Range(Selection, Selection.Offset(220, 0))
     ActiveCell.Offset(0, 1).Select
-    ActiveCell.FormulaR1C1 = "=R[-1]C[-1]*RC[-1]"
-    Selection.Interior.ColorIndex = 6
-    Selection.Offset(2, 0).FormulaR1C1 = "=(Sum(R[2]C:R[306]C))"
+    ActiveCell.FormulaR1C1 = "=IF(RC[-1]=""CALC"",R[2]C[-1]*-R[1]C[-1],"""")"
+    Selection.AutoFill Destination:=Range(Selection, Selection.Offset(220, 0))
+    ActiveCell.Offset(-3, 0).Select
+    ActiveCell.FormulaR1C1 = "=SUM(R[4]C:R[220]C)"
+    With Selection.Interior
+        .Pattern = xlSolid
+        .PatternColorIndex = xlAutomatic
+        .Color = 65535
+        .TintAndShade = 0
+        .PatternTintAndShade = 0
+    End With
+
 
 End Sub
 
