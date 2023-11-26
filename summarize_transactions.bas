@@ -8,9 +8,11 @@ Sub transformSheet()
     Dim pf As PivotField
     
 ' 1) Rename sheet to a shorter version
+    Dim year As String
+    year = DatePart("yyyy", Now())
 
     sheetName = Replace(ActiveSheet.Name, "-TradeActivity", "")
-    sheetName = Replace(sheetName, "2023-", "")
+    sheetName = Replace(sheetName, year & "-", "")
     sheetName = Replace(sheetName, "-", "_")
     ActiveSheet.Name = sheetName
     sheetName = "head_" & sheetName
@@ -125,7 +127,7 @@ Sub transformSheet()
     ActiveCell.FormulaR1C1 = "=IF(RC[-1]=""CALC"",R[2]C[-1]*-R[1]C[-1],"""")"
     Selection.AutoFill Destination:=Range(Selection, Selection.Offset(100, 0))
     ActiveCell.Offset(-3, 0).Select
-    ActiveCell.FormulaR1C1 = "=SUM(R[4]C:R[100]C)"
+    ActiveCell.FormulaR1C1 = "=SUM(R[3]C:R[100]C)"
     With Selection.Interior
         .Pattern = xlSolid
         .PatternColorIndex = xlAutomatic
@@ -133,6 +135,7 @@ Sub transformSheet()
         .TintAndShade = 0
         .PatternTintAndShade = 0
     End With
+    
 
 End Sub
 
@@ -178,7 +181,7 @@ Sub updateSummary()
 
 '1) Clear segments that will be updated (eg Pivot Table) and select range with data
     Dim pf As PivotField
-    Sheets("Summary").Columns("O:X").Clear
+    Sheets("Summary").Columns("O:T").Clear
     Sheets("Summary").Range("A5").Select
     Range(Selection, Selection.Offset(0, 12)).Select
     Range(Selection, Selection.End(xlDown)).Select
@@ -255,7 +258,7 @@ Sub updateSummary()
     ActiveCell.FormulaR1C1 = "=IF(RC[-1]=""CALC"",R[2]C[-1]*-R[1]C[-1],"""")"
     Selection.AutoFill Destination:=Range(Selection, Selection.Offset(220, 0))
     ActiveCell.Offset(-3, 0).Select
-    ActiveCell.FormulaR1C1 = "=SUM(R[4]C:R[220]C)"
+    ActiveCell.FormulaR1C1 = "=SUM(R[3]C:R[220]C)"
     With Selection.Interior
         .Pattern = xlSolid
         .PatternColorIndex = xlAutomatic
@@ -267,7 +270,26 @@ Sub updateSummary()
 
 End Sub
 
-
+Sub addCsvFileAsNewSheet()
+    
+    Dim sourceFilePath As Variant
+    Dim screenUpdating As Boolean
+    Application.screenUpdating = False
+    
+    ' 1) Locate and open file. If no file is selected an error message will pop up. Selected file will be assigned to sourceFilePath
+    sourceFilePath = Application.GetOpenFilename("Text Files (*.csv), *.csv", , "Locate file to import", , False)
+    
+    If TypeName(sourceFilePath) = "Boolean" Then
+        MsgBox "No file was selected", , "Unable to locate file to import..."
+        GoTo StopLabel
+    End If
+    
+    ActiveWorkbook.Sheets.Add Type:=sourceFilePath, Before:=Sheets("Summary")
+    Range("buttonCells").Copy ActiveSheet.Range("Q1")
+StopLabel:
+    Application.screenUpdating = True
+    
+End Sub
 
 
 
