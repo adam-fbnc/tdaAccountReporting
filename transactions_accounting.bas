@@ -3,10 +3,12 @@ Option Explicit
 
 ' Account related variables
 Dim accountSymbols As New Dictionary
-Dim accountInventoryStrings As New Dictionary
+Dim accountInventoryStrings As New Dictionary 'All ending with "String" variables will be retrieved at the beginning and saved at the end of execution, updated just before from the Array
+Dim accountInventoryValues As New Dictionary  'All ending with "Values" variables will be retrieved once at the beginning; there's no need to resave them
+Dim accountInventoryArrays As New Dictionary  'All ending with "Arrays" variables will be populated based on "String" variables above
 Dim accountProfitStrings As New Dictionary
-Dim accountInventoryValues As New Dictionary
 Dim accountProfitValues As New Dictionary
+Dim accountProfitArrays As New Dictionary
 Dim accountCashBalance As Double
 Dim accountInterestEarned As Double
 Dim accountRegFeesPaid As Double
@@ -29,13 +31,15 @@ Dim iOldInventoryArray() As String
 Dim iProfitOrLoss As String              ' numeric values stored as String
 Dim iProfitOrLossFormulaString As String ' follows " = + 1 + 2.... " format
 Dim iNumericProfitArray() As Double
+Dim item As Variant
 
 Sub bookTransaction()
 
 Dim i As Integer
+Dim j As Integer
 Dim length As Integer
 
-Dim item As Variant
+
 Dim sellShort As Integer
 Dim buyToCover As Integer
 
@@ -48,8 +52,6 @@ Dim trSymbolCell As Range
 Dim invCell As Range
 Dim profitCell As Range
 
-Dim test As String
-Dim testArray() As String
 'Dim inventoryString As String
 'Dim oldInventoryValue As Double
 
@@ -69,18 +71,20 @@ Debug.Print "Current cash balance " & accountCashBalance
 ' In this section accountInventoryStrings and accountInventoryValues will be written to worksheet at the end of the iterating loop
 ' Write a new Sub doing that
 
-For i = 2 To 6 'length
+For i = 2 To 3 'length
 Debug.Print vbCr & "----------------------------------------------------- Iteration Number " & (i - 1) & " -----------------------------------------------------"
-'    transaction = Range(Cells(i, 1), Cells(i, 10))
     
     Call setIterVariables(i)
     ' If no trSymbol, then it's either cash transaction or internal transfer
+    Debug.Print trDescription
     If trSymbol = "" Then
         processCash trAmount, trDescription
         Debug.Print "Cash balance after '" & trDescription & "' transaction is " & accountCashBalance & ", and interest earned so far is " & accountInterestEarned
         GoTo NextIteration
     End If
     
+    ReDim iPurchaseArray(1 To trQuantity)
+    ReDim iSaleArray(1 To trQuantity)
     sellShort = InStr(trDescription, "Short")
     buyToCover = InStr(trDescription, "Cover")
 '    Debug.Print "Is it a Short Sale? - " & (sellShort > 0)
@@ -102,11 +106,7 @@ Debug.Print vbCr & "----------------------------------------------------- Iterat
 '    Debug.Print "Inventory purchase string from getExpanded function : " & getExpanded(trPrice, trQuantity)
         ' If it's regular BUY
         If buyToCover = 0 Then
-        Debug.Print "Processing regular BUY"
-'            iProfitOrLoss = accountProfitStrings.item(trSymbol)
-'            If iInventoryFormulaString = "" Then
-'            iInventoryFormulaString = "= "
-'            End If
+            Debug.Print "Processing regular BUY"
             iPurchaseArray = getArray(trPrice, trQuantity)
             ReDim iNewInventoryArray(1 To (UBound(iOldInventoryArray) + UBound(iPurchaseArray)))
             iNewInventoryArray = mergeAndSortArray(iOldInventoryArray, iPurchaseArray)
@@ -127,24 +127,25 @@ Debug.Print vbCr & "----------------------------------------------------- Iterat
     ' If trAmount is positive (we get cash) then book sale
     ElseIf trAmount > 0 Then
     
-    accountCashBalance = accountCashBalance - trRegFee
-    accountRegFeesPaid = accountRegFeesPaid + trRegFee
-    Debug.Print "Cash balance after sale transaction " & accountCashBalance & ". RegFee paid: " & trRegFee & ", and  RegFees paid so far: " & accountRegFeesPaid
-    ' This should seemlessly process the sales in the following situations:
-    ' 1) With regards to profit & loss:
-    '   a) Sale when all inventory items result in profit
-    '   b) When all inventory items result in a loss
-    '   c) When some generate profit and some loss
-    ' 2) With respect to inventory
-    '   a) Positive inventory at the beginning, positive inventory at the end
-    '       i) Also, how do record a sale at a loss? If there's no inventory, either positive or negative,
-    '           the difference in sale and carrying cost goes to P&L
-    '   b) Positive inventory ends up with negative inventory
-    '   c) Negative inventory grows more negative
-        ' If it's regular SELL
+        accountCashBalance = accountCashBalance - trRegFee
+        accountRegFeesPaid = accountRegFeesPaid + trRegFee
+        Debug.Print "Cash balance after sale transaction " & accountCashBalance & ". RegFee paid: " & trRegFee & ", and  RegFees paid so far: " & accountRegFeesPaid
+        ' This should seemlessly process the sales in the following situations:
+        ' 1) With regards to profit & loss:
+        '   a) Sale when all inventory items result in profit
+        '   b) When all inventory items result in a loss
+        '   c) When some generate profit and some loss
+        ' 2) With respect to inventory
+        '   a) Positive inventory at the beginning, positive inventory at the end
+        '       i) Also, how do record a sale at a loss? If there's no inventory, either positive or negative,
+        '           the difference in sale and carrying cost goes to P&L
+        '   b) Positive inventory ends up with negative inventory
+        '   c) Negative inventory grows more negative
+            ' If it's regular SELL
         If sellShort = 0 Then
             ' Do SELL activities here
             iSaleArray = getArray(trPrice, trQuantity)
+            Debug.Print "New array size after sale " & (UBound(iOldInventoryArray) - UBound(iSaleArray) + 1)
             ReDim iNewInventoryArray(1 To (UBound(iOldInventoryArray) - UBound(iSaleArray)))
             iNewInventoryArray = shrinkArray(iOldInventoryArray, iSaleArray)
             If iInventoryCost = "" Then
@@ -158,12 +159,7 @@ Debug.Print vbCr & "----------------------------------------------------- Iterat
         End If
     End If
     
-'    test = "= +115.19+115.20+115.31+115.42+115.53+115.64+115.75+115.86+115.91+115.98"
-'    testArray = convertToArray(test)
-'    For Each item In testArray
-'    Debug.Print "Using array: " & item
-'    Next item
-'    Debug.Print "testArray size: " & UBound(testArray)
+
 '    iOldInventoryArray(1) = 115.63
 '    iOldInventoryArray(2) = 115.63
 
@@ -176,13 +172,24 @@ Debug.Print vbCr & "----------------------------------------------------- Iterat
 '    For Each item In iNewInventoryArray
 '       Debug.Print "Processed array: " & item
 '    Next item
-    
+
     Debug.Print "Processed inventory array's size is: " & UBound(iNewInventoryArray)
-    Debug.Print "Processed array converted to string: " & convertArrayToString(iNewInventoryArray)
+'    For j = 1 To UBound(iNewInventoryArray)
+'    Debug.Print "Iteration " & j & " and array member is: " & iNewInventoryArray(j)
+'    Next
+    Debug.Print "Processed array converted to string: " & iInventoryFormulaString
     
-' STEP N-1 - Save the changes in inventory and profit caused by transaction (1 iteration) to dictionary entry for that particular Symbol
+' STEP N-1 - Save the inventory and P&L changes caused by transaction (1 iteration) to dictionary entry for that particular Symbol
+    iProfitOrLoss = getNewProfitOrLoss
+    accountInventoryStrings(trSymbol) = iInventoryFormulaString
     accountInventoryValues(trSymbol) = iInventoryCost
     accountProfitStrings(trSymbol) = iProfitOrLossFormulaString
+    accountProfitValues(trSymbol) = iProfitOrLoss
+    Debug.Print "Processed inventory cost is: " & iInventoryCost
+    
+    Debug.Print "Profit realized for " & trSymbol & " so far: " & iProfitOrLoss
+    Debug.Print "Profit / loss after sale as string: " & iProfitOrLossFormulaString
+    
 NextIteration:
 Next
 
@@ -225,8 +232,8 @@ Debug.Print "old inventory :" & oldArraySize + 1
 Debug.Print "sale inventory :" & saleArraySize
 
 smallerArraySize = oldArraySize - saleArraySize + 1
-ReDim smallerArray(1 To smallerArraySize + 1)
-ReDim iNumericProfitArray(1 To smallerArraySize + 1)
+ReDim smallerArray(1 To smallerArraySize)
+ReDim iNumericProfitArray(1 To trQuantity)
 
 salePrice = CDbl(saleArray(1))
 minUnitCost = CDbl(oldInventory(0))
@@ -238,14 +245,14 @@ Debug.Print "salePrice: " & salePrice
 
 'Step 1: Determine where sale price falls
 
-counter = 0
+
 If salePrice >= maxUnitCost Then
     ' All units sold at profit. Select 'quanitity' from the right to minize total profit
     ' Loop 1: to create new array after sale
-    Debug.Print "This will iterate " & smallerArraySize & " times"
-    
+    Debug.Print "Remaining inventory will iterate " & smallerArraySize & " times"
+        counter = 0
         Do
-            Debug.Print "Inside remaining inventory loop - " & oldInventory(counter)
+'            Debug.Print "Inside remaining inventory loop - " & oldInventory(counter)
             ' smallerArray will contain remaining inventory; all of the cheaper ones (smaller indexes) will remain
             smallerArray(counter + 1) = oldInventory(counter)
             counter = counter + 1
@@ -256,16 +263,21 @@ If salePrice >= maxUnitCost Then
         counter = 1
         Do
             iNumericProfitArray(counter) = Round(salePrice - CDbl(oldInventory(counter + trQuantity)), 2)
-            Debug.Print "Sold item with " & oldInventory(counter + trQuantity) & " cost. Profit from iteration " & counter & " is " & iNumericProfitArray(counter)
+'            Debug.Print "Sold item with " & oldInventory(counter + trQuantity) & " cost. Profit from iteration " & counter & " is " & iNumericProfitArray(counter)
             counter = counter + 1
-        Loop Until counter = smallerArraySize
+        Loop Until counter = smallerArraySize - 1
+        
+        iInventoryFormulaString = convertArrayToString(smallerArray)
+        Debug.Print "Smaller array string after sale :" & iInventoryFormulaString
+        iProfitOrLossFormulaString = iProfitOrLoss & convertDoubleArrayToString(iNumericProfitArray)
+        
 ElseIf salePrice < minUnitCost Then
     ' All units sold at loss. Select 'quanitity' from the left to minize total loss
     ' Two loops: one to create new array after sale, and another to calculate loss
-        
+        Debug.Print "Remaining inventory will iterate " & smallerArraySize & " times"
         counter = 0
         Do
-            Debug.Print "Inside remaining inventory loop - " & oldInventory(counter + trQuantity)
+'            Debug.Print "Inside remaining inventory loop - " & oldInventory(counter + trQuantity)
             ' smallerArray will contain remaining inventory; all of the expensive ones (larger indexes) will remain
             smallerArray(counter + 1) = oldInventory(counter + trQuantity)
             counter = counter + 1
@@ -276,11 +288,19 @@ ElseIf salePrice < minUnitCost Then
         counter = 1
         Do
             iNumericProfitArray(counter) = Round(salePrice - CDbl(oldInventory(counter - 1)), 2)
-            Debug.Print "Sold item with " & oldInventory(counter - 1) & " cost. Loss from iteration " & counter & " is " & iNumericProfitArray(counter)
+'            Debug.Print "Sold item with " & oldInventory(counter - 1) & " cost. Loss from iteration " & counter & " is " & iNumericProfitArray(counter)
             counter = counter + 1
-        Loop Until counter = smallerArraySize - 1
+        Loop Until counter = trQuantity + 1
+'        Debug.Print "Member count profit array: " & UBound(iNumericProfitArray)
+        iInventoryFormulaString = convertArrayToString(smallerArray)
+        Debug.Print "Smaller array string after sale :" & iInventoryFormulaString
+        iProfitOrLossFormulaString = iProfitOrLoss & convertDoubleArrayToString(iNumericProfitArray)
+
 Else
     ' Units sold as well as profit and loss will depend on each individual case
+    ' Calculate profit/loss and find minimal p/l from right to left and from left to right
+    ' Write a function that will return an index if where inventory sale will start
+    ' Underneath write another function that uses
 End If
 
     shrinkArray = smallerArray
@@ -499,6 +519,26 @@ Next
 
 End Function
 
+Function convertDoubleArrayToString(arr() As Double) As String
+Dim returnString As String
+Dim symbol As String
+Dim counter As Integer
+Dim item As Variant
+convertDoubleArrayToString = ""
+symbol = "+"
+If Left(arr(1), 1) = "-" Then
+symbol = ""
+End If
+
+For Each item In arr()
+If item <> "" Then
+    convertDoubleArrayToString = convertDoubleArrayToString & symbol & CStr(item)
+'    Debug.Print "Convert array to string item: " & item
+End If
+Next
+
+End Function
+
 Function buyPosition(trSymbol As String, trPrice As Double, trQuantity As Integer) As String
 
 Dim transUnits As New Collection
@@ -595,3 +635,163 @@ Sub setIterVariables(i As Integer)
     iInventoryFormulaString = accountInventoryStrings.item(trSymbol)
     iOldInventoryArray = convertToArray(iInventoryFormulaString)
 End Sub
+
+Function getNewProfitOrLoss() As String
+Dim sum As Double
+sum = CDbl(iProfitOrLoss)
+getNewProfitOrLoss = iProfitOrLoss
+For Each item In iNumericProfitArray
+sum = sum + Round(item, 2)
+Next
+getNewProfitOrLoss = CStr(sum)
+End Function
+
+Sub test()
+trQuantity = 5
+trAmount = 110 * trQuantity
+
+Dim newColl As Collection
+Dim test As String
+Dim testArray() As String
+Dim newArray() As String
+Dim sumsArray() As Double
+'ReDim newArray(1 To trQuantity)
+'Set newColl = New Collection
+
+    test = "= +105.19+106.20+107.31+108.42+109.53+110.64+111.75+112.86+113.91+115.08"
+    testArray = convertToArray(test)
+    Call printArray(testArray)
+'    For Each item In testArray
+'    Debug.Print "Using array: " & item
+'    Next item
+    Debug.Print "testArray size: " & UBound(testArray) + 1
+
+newArray = sliceArray(testArray, 3)
+Debug.Print "newArray size: " & UBound(newArray)
+Call printArray(newArray)
+
+Set newColl = getCollectionFromArray(newArray)
+Debug.Print "Size of collection " & newColl.count
+Call printCollection(newColl)
+Debug.Print "Sum of collection " & sumCollection(newColl)
+Dim size As Integer
+size = UBound(testArray) - trQuantity + 2
+Debug.Print "How many sums? - " & size
+
+sumsArray = getArrayOfSums(testArray)
+
+End Sub
+
+Function sliceArray(arr() As String, startFrom As Integer) As String()
+'--SF-->>(SF+Q)-- Returns a slice of the Array that starts at startFrom and moves left -> trQuantity number of steps
+' The trQuantity variable used for number of iterations is public
+Dim arraySlice() As String
+ReDim arraySlice(1 To trQuantity)
+Dim counter As Integer
+counter = 1
+
+'Debug.Print "Quant " & trQuantity
+'Debug.Print "Index " & startFrom
+
+For counter = 1 To trQuantity
+arraySlice(counter) = arr(counter + startFrom - 2)
+'Debug.Print "sliceArray (" & counter & ") is " & arraySlice(counter)
+Next
+
+
+sliceArray = arraySlice
+
+End Function
+
+
+Sub printArray(arr() As String)
+Dim i As Integer
+i = 1
+
+    For Each item In arr
+       Debug.Print "Member (" & i & ") of Array is " & item
+       i = i + 1
+    Next item
+End Sub
+
+Function getCollectionFromArray(arr() As String) As Collection
+Dim coll As New Collection
+Dim size As Integer
+Dim i As Integer
+
+size = UBound(arr)
+'Debug.Print "Size of array passed " & size
+
+For Each item In arr()
+coll.Add (CStr(item))
+Next
+
+Set getCollectionFromArray = coll
+
+End Function
+
+Sub printCollection(coll As Collection)
+Dim i As Integer
+i = 1
+
+    For Each item In coll
+       Debug.Print "Member (" & i & ") of Collection is " & item
+       i = i + 1
+    Next item
+End Sub
+
+Function sumCollection(coll As Collection) As Double
+Dim sum As Double
+Dim size As Integer
+Dim i As Integer
+
+sum = 0
+size = coll.count
+'Debug.Print "Size of collection passed " & size
+
+For Each item In coll
+sum = sum + Round(CDbl(item), 2)
+'Debug.Print "Sum so far " & sum
+Next
+
+sumCollection = sum
+
+End Function
+
+Function minProfitMinLoss(arr() As String) As String()
+' Inputs are: 1- inventory array arr(), 2- transaction Amount trAmount and 3- transaction Quantity trQuantity
+' Only inventory is specicified as parameter because, while inventory array is know, it may change
+Dim result(1 To 4) As Double
+' 1- For least profit amount. 2- startFrom index for sliceArray function. 3- For least loss amount. 3- startFrom index
+' If there's no profit / loss then amount should be set to 0
+Dim sumsArray() As Double
+Dim size As Integer
+Dim tempArray() As String
+Dim tempColl As New Collection
+Dim i As Integer
+sumarray = getArrayOfSums(arr)
+
+Set coll = getCollectionFromArray(arr)
+
+End Function
+
+Function getArrayOfSums(arr() As String) As Double()
+Dim sumsArray() As Double
+Dim size As Integer
+Dim tempArray() As String
+Dim tempColl As New Collection
+Dim i As Integer
+'Create array slices that trQuantity long
+
+size = UBound(arr) - trQuantity + 2
+ReDim sumsArray(1 To size)
+Debug.Print "How many sums (from inside function)? - " & size
+
+For i = 1 To size
+    tempArray = sliceArray(arr, i)
+    Set tempColl = getCollectionFromArray(tempArray)
+    sumsArray(i) = sumCollection(tempColl)
+    Debug.Print "Sum of (" & i & ") of array Slice is " & sumsArray(i)
+Next
+End Function
+
