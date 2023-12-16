@@ -1,4 +1,4 @@
-Attribute VB_Name = "Module1"
+Attribute VB_Name = "summarize_transactions"
 Sub transformSheet()
 
 '
@@ -23,6 +23,7 @@ Sub transformSheet()
     , LookAt:=xlPart, SearchOrder:=xlByRows, SearchDirection:=xlNext).Select
 
     ' 2.a) Add a named range that will be used later on
+    ActiveWindow.FreezePanes = True
     ActiveWorkbook.Names.Add Name:=sheetName, RefersTo:=Selection
     ActiveCell.Offset(1, 14).Select
 
@@ -136,6 +137,7 @@ Sub transformSheet()
         .PatternTintAndShade = 0
     End With
     
+Range("U3:V249").NumberFormat = "#,##0.00_);[Red](#,##0.00)"
 
 End Sub
 
@@ -267,6 +269,7 @@ Sub updateSummary()
         .PatternTintAndShade = 0
     End With
 
+Range("T2:T249").NumberFormat = "#,##0.00_);[Red](#,##0.00)"
 
 End Sub
 
@@ -274,20 +277,20 @@ Sub addCsvFileAsNewSheet()
     
     Dim sourceFilePath As Variant
     Dim screenUpdating As Boolean
+'    On Error GoTo ErrHandler
+    screenUpdating = Application.screenUpdating
     Application.screenUpdating = False
     
     ' 1) Locate and open file. If no file is selected an error message will pop up. Selected file will be assigned to sourceFilePath
     sourceFilePath = Application.GetOpenFilename("Text Files (*.csv), *.csv", , "Locate file to import", , False)
     
     If TypeName(sourceFilePath) = "Boolean" Then
-        MsgBox "No file was selected", , "Unable to locate file to import..."
-        GoTo StopLabel
+        MsgBox "No file was selected", , "Locating file to import..."
+'        GoTo ExitHandler
     End If
     
     ActiveWorkbook.Sheets.Add Type:=sourceFilePath, Before:=Sheets("Summary")
     Range("buttonCells").Copy ActiveSheet.Range("Q1")
-StopLabel:
-    Application.screenUpdating = True
     
 End Sub
 
