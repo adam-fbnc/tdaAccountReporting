@@ -68,7 +68,7 @@ Debug.Print "Current cash balance " & accountCashBalance
 ' In this section accountInventoryFormulaStrings and accountProfitFormulaStrings will be written to worksheet at the end of the iterating loop
 ' Write a new Sub doing that
 
-For i = 2 To 5 'length ' number of iterations
+For i = 2 To 6 'length ' number of iterations
     Call setIterVariables(i)
     trType = getTransactionType(trDescription)
     Debug.Print vbCr & "----------------------------------------------------- Iteration Number " & (i - 1) & ": " & trType & " -----------------------------------------------------"
@@ -94,7 +94,6 @@ For i = 2 To 5 'length ' number of iterations
     Debug.Print "Cash balance after purchase transaction " & accountCashBalance
         ' If it's regular BUY
         If trType = "BUY" Then
-            Debug.Print "Buying by calling regularBuy"
             Call regularBuy
         Else ' If it's BUY TO COVER
             Debug.Print "Processing BUY TO COVER"
@@ -240,6 +239,7 @@ End If
     Debug.Print "Remaining inventory as string :" & iInventoryFormulaString
     iProfitOrLossFormulaString = iProfitOrLoss & convertDoubleArrayToString(iNumericProfitArray)
     shrinkArray = remainingInvArray
+    Debug.Print "Remaining inventory value " & sumCollection(getCollectionFromArray(remainingInvArray))
 End Function
 
 Function cutOutSoldArray(oldInvArray() As String, sliceIndex As Integer) As String()
@@ -297,7 +297,7 @@ getArrayOfProfits = profitsArray
 
 End Function
 Function mergeAndSortArray(oldInventory() As String, newPurchase() As String) As String()
-Debug.Print "old Inv size " & UBound(oldInventory)
+Debug.Print "old Inv size " & UBound(oldInventory) + 1
 If UBound(oldInventory) < 1 Then
     iInventoryFormulaString = convertArrayToString(newPurchase)
     Debug.Print "There was no inventory so we just added the purchase: " & iInventoryFormulaString
@@ -351,9 +351,17 @@ Next item
 
 'Step 2: Sort the numeric array
 
+
+'Set coll = sortCollection(coll)
+'For Each item In coll
+''Debug.Print "Sorted collection :" & item
+'combinedArray(counter) = CStr(item)
+'counter = counter + 1
+'Next item
+
 counter = 1
-Set coll = sortCollection(coll)
-For Each item In coll
+Call shellSortAscending(numArray, combinedArraySize + 1)
+For Each item In numArray
 'Debug.Print "Sorted collection :" & item
 combinedArray(counter) = CStr(item)
 counter = counter + 1
@@ -401,16 +409,16 @@ Set sortCollection = newColl
 End Function
 
 
-Function getArray(trPrice As Double, trQuantity As Integer) As String()
+Function getArrayFromPriceAndQuantity(trPrice As Double, trQuantity As Integer) As String()
 Dim arr() As String
 Dim i As Integer
-'Debug.Print "Quantity passed to getArray function: " & trQuantity
+'Debug.Print "Quantity passed to getArrayFromPriceAndQuantity function: " & trQuantity
 ReDim arr(1 To trQuantity)
 
 For i = 1 To trQuantity
 arr(i) = CStr(trPrice)
 Next
-getArray = arr
+getArrayFromPriceAndQuantity = arr
 End Function
 
 Function convertStringToArray(inventoryString As String) As String()
@@ -520,31 +528,35 @@ Next
 End Function
 
 Sub regularBuy()
+Dim existingInventoryValue As Double
+Dim addedInventoryValue As Double
 Debug.Print "Processing regular BUY"
-iPurchaseArray = getArray(trPrice, trQuantity)
+iPurchaseArray = getArrayFromPriceAndQuantity(trPrice, trQuantity)
 Debug.Print "New array size after purchase " & (UBound(iOldInventoryArray) + UBound(iPurchaseArray) + 1)
 ReDim iNewInventoryArray(1 To (UBound(iOldInventoryArray) + UBound(iPurchaseArray)))
 iNewInventoryArray = mergeAndSortArray(iOldInventoryArray, iPurchaseArray)
-    
+existingInventoryValue = CDbl(iInventoryCost)
+addedInventoryValue = Round(trPrice * trQuantity, 2)
+iInventoryCost = CStr(existingInventoryValue + addedInventoryValue)
 End Sub
 
 Sub regularSell()
 
-iSaleArray = getArray(trPrice, trQuantity)
+iSaleArray = getArrayFromPriceAndQuantity(trPrice, trQuantity)
 Debug.Print "New array size after sale " & (UBound(iOldInventoryArray) - UBound(iSaleArray) + 1)
 ReDim iNewInventoryArray(1 To (UBound(iOldInventoryArray) - UBound(iSaleArray)) + 1)
 iNewInventoryArray = shrinkArray(iOldInventoryArray, iSaleArray)
     
 End Sub
 
-Function getCollection(trPrice As Double, trQuantity As Integer) As Collection
+Function getCollectionFromPriceAndQuantity(trPrice As Double, trQuantity As Integer) As Collection
 Dim coll As New Collection
 Dim i As Integer
 
 For i = 1 To trQuantity
 coll.Add (trPrice)
 Next
-Set getCollection = coll
+Set getCollectionFromPriceAndQuantity = coll
 End Function
 
 Sub processCash(trAmount As Double, trDescription As String)
@@ -595,7 +607,7 @@ accountInterestEarned = Sheets("Inventory").Cells(1, 9).Value2
 accountRegFeesPaid = Sheets("Inventory").Cells(1, 11).Value2
 accountCommissionPaid = Sheets("Inventory").Cells(1, 13).Value2
 
-Debug.Print "Number of Symbols added to dictionary :" & accountSymbols.count
+Debug.Print "Number of Symbols added to dictionary: " & accountSymbols.count
 End Sub
  
 Sub setIterVariables(i As Integer)
@@ -625,7 +637,7 @@ Dim sum As Double
 sum = CDbl(iProfitOrLoss)
 getNewProfitOrLoss = iProfitOrLoss
 For Each item In iNumericProfitArray
-    Debug.Print "Items of iNumericProfitArray " & item
+'    Debug.Print "Items of iNumericProfitArray " & item
     sum = sum + Round(item, 2)
 Next
 getNewProfitOrLoss = CStr(sum)
@@ -640,34 +652,84 @@ Dim test As String
 Dim testArray() As String
 Dim newArray() As String
 Dim sumsArray() As Double
+Dim numArray() As Double
 'ReDim newArray(1 To trQuantity)
 'Set newColl = New Collection
 
-    test = "= +105.19+106.20+107.31+108.42+109.53+110.64+111.75+112.86+113.91+115.08"
+'    test = "= +105.19+106.20+107.31+108.42+109.53+110.64+111.75+112.86+113.91+115.08"
+    test = "= +112.86+110.64+115.08+105.19+111.75+106.20+113.91+108.42+109.53+107.31+114.23"
     testArray = convertStringToArray(test)
+    numArray = convertStringsToDoubles(testArray)
 '    Call printArray(testArray)
 '    For Each item In testArray
 '    Debug.Print "Using array: " & item
 '    Next item
 '    Debug.Print "testArray size: " & UBound(testArray) + 1
 
-newArray = sliceArray(testArray, 3, trQuantity)
+'newArray = sliceArray(testArray, 3, trQuantity)
 'Debug.Print "newArray size: " & UBound(newArray)
 'Call printArray(newArray)
 
-Set newColl = getCollectionFromArray(newArray)
+'Set newColl = getCollectionFromArray(newArray)
 'Debug.Print "Size of collection " & newColl.count
 'Call printCollection(newColl)
 'Debug.Print "Sum of collection " & sumCollection(newColl)
 Dim size As Integer
-size = UBound(testArray) - trQuantity + 2
-'Debug.Print "How many sums? - " & size
+size = UBound(numArray)
+Debug.Print "How many elements in the above array? - " & size
 
 'sumsArray = getArrayOfSums(testArray)
-
-Call printArray(minProfitMinLoss(testArray))
+'Call printArray(testArray, "Strings")
+'Call printDoubleArray(numArray, "Unsorted")
+Call shellSortAscending(numArray, size)
+Call printDoubleArray(numArray, "Should be sorted")
 
 End Sub
+
+
+Private Sub shellSortAscending(ByRef a() As Double, N As Integer)
+    ' Adapted from jdrago @ https://stackoverflow.com/questions/11504418/excel-vba-quickest-way-to-sort-an-array-of-numbers-in-descending-order
+    ' requires a(1..N)
+'    Debug.Print UBound(a)
+    Debug.Assert LBound(a) = 1
+
+    ' setup
+
+    Dim i, j, inc As Integer
+    Dim v As Double
+    inc = 1
+
+    ' determine the starting incriment
+
+    Do
+        inc = inc * 3
+        inc = inc + 1
+    Loop While inc <= N
+
+    ' loop over the partial sorts
+
+    Do
+        inc = inc / 3
+
+        ' Outer loop of straigh insertion
+
+        For i = inc + 1 To N
+            v = a(i)
+            j = i
+
+            ' Inner loop of straight insertion
+            ' switch to a(j - inc) > v for ascending, replace sign to < for descending
+
+            Do While a(j - inc) > v
+                a(j) = a(j - inc)
+                j = j - inc
+                If j <= inc Then Exit Do
+            Loop
+            a(j) = v
+        Next i
+    Loop While inc > 1
+End Sub
+
 
 Function sliceArray(arr() As String, startFrom As Integer, count As Integer) As String()
 '--SF-->>(SF+Q)-- Returns a slice of the Array that starts at startFrom and moves left -> trQuantity number of steps
@@ -759,6 +821,24 @@ For i = 1 To size
 Next
 getArrayOfSums = sumsArray
 End Function
+Function convertStringsToDoubles(arr() As String) As Double()
+Dim numsArray() As Double
+Dim size As Integer
+Dim tempArray() As String
+Dim tempColl As New Collection
+Dim i As Integer
+'Create array slices that trQuantity long
+
+size = UBound(arr) + 1
+ReDim numsArray(1 To size)
+'Debug.Print "How many elements in array? - " & size
+i = 1
+For Each item In arr
+numsArray(i) = CDbl(item)
+i = i + 1
+Next
+convertStringsToDoubles = numsArray
+End Function
 
 Function getCollectionFromArray(arr() As String) As Collection
 Dim coll As New Collection
@@ -810,12 +890,18 @@ i = 1
     Next item
 End Sub
 
-Sub printDoubleArray(arr() As Double)
+Sub printDoubleArray(arr() As Double, Optional comment As String)
 Dim i As Integer
+Dim note As String
+If comment = "" Then
+note = ""
+Else
+note = comment & " : "
+End If
 i = 1
 
     For Each item In arr
-       Debug.Print "Member (" & i & ") of Array is " & item
+       Debug.Print note & "Member (" & i & ") of Array is " & item
        i = i + 1
     Next item
 End Sub
