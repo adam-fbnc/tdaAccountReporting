@@ -83,16 +83,6 @@ For i = 2 To 5 'length ' number of iterations
     
     ReDim iPurchaseArray(1 To trQuantity)
     ReDim iSaleArray(1 To trQuantity)
-
-
-    
-'    Debug.Print "Is it a Short Sale? - " & (sellShort > 0)
-'    Debug.Print "Is it a Buy To Cover? - " & (buyToCover > 0)
-'    Debug.Print "Short Sale? - " & sellShort
-'    Debug.Print "Buy To Cover? - " & buyToCover
-'    Debug.Print "i = " & i:      Debug.Print trDate:     Debug.Print trQuantity:     Debug.Print trPrice:     Debug.Print trRegFee
-'    Debug.Print "Symbol = " & trSymbol
-'    Debug.Print "The row " & trSymbol & " occupies is " & trSymbolAddress
     
     Debug.Print "Amount = " & trAmount & ". Existing cost of " & trSymbol & " inventory: " & iInventoryCost & " with accumulated profit / loss of " & iProfitOrLoss & "."
     Debug.Print "Old inventory from spreadsheet: " & iInventoryFormulaString
@@ -104,6 +94,7 @@ For i = 2 To 5 'length ' number of iterations
     Debug.Print "Cash balance after purchase transaction " & accountCashBalance
         ' If it's regular BUY
         If trType = "BUY" Then
+            Debug.Print "Buying by calling regularBuy"
             Call regularBuy
         Else ' If it's BUY TO COVER
             Debug.Print "Processing BUY TO COVER"
@@ -172,7 +163,6 @@ Next
 End Sub
 
 Function shrinkArray(oldInventory() As String, saleArray() As String) As String()
-Dim item As Variant
 Dim counter As Integer
 counter = 1
 
@@ -190,7 +180,6 @@ Dim soldInventorySize As Integer
 Dim oldArraySize As Integer
 Dim saleArraySize As Integer
 Dim sliceIndex As Integer
-Dim salePrice As Double
 Dim minUnitCost As Double
 Dim maxUnitCost As Double
 Dim minProfitOrMinLossArray() As String
@@ -208,29 +197,28 @@ ReDim remainingInvArray(1 To remainingInvArraySize)
 ReDim iNumericProfitArray(1 To trQuantity)
 ReDim soldInventoryArray(1 To soldInventorySize)
 
-salePrice = CDbl(saleArray(1))
 minUnitCost = CDbl(oldInventory(0))
 maxUnitCost = CDbl(oldInventory(oldArraySize))
 
 Debug.Print "minUnitCost with index 0: " & minUnitCost
 Debug.Print "maxUnitCost with index " & oldArraySize & ": " & maxUnitCost
-Debug.Print "salePrice: " & salePrice
+Debug.Print "salePrice: " & trPrice
 
 'Step 1: Determine where sale price falls
 
-If salePrice >= maxUnitCost Then
-    ' All units sold at profit. Select 'quanitity' from the right to minize total profit
+If trPrice >= maxUnitCost Then
+    ' All units sold at profit. Select 'quanitity' from the right to minimize total profit
         Debug.Print "Remaining inventory will iterate " & remainingInvArraySize & " times"
         remainingInvArray = sliceArray(oldInventory, 1, remainingInvArraySize)
         soldInventoryArray = sliceArray(oldInventory, remainingInvArraySize + 1, saleArraySize)
 End If
-If salePrice < minUnitCost Then
-    ' All units sold at loss. Select 'quanitity' from the left to minize total loss
+If trPrice < minUnitCost Then
+    ' All units sold at loss. Select 'quantity' from the left to minize total loss
         Debug.Print "Remaining inventory will iterate " & remainingInvArraySize & " times"
         remainingInvArray = sliceArray(oldInventory, saleArraySize + 1, remainingInvArraySize)
         soldInventoryArray = sliceArray(oldInventory, 1, saleArraySize)
 End If
-If salePrice < maxUnitCost And salePrice >= minUnitCost Then
+If trPrice < maxUnitCost And trPrice >= minUnitCost Then
     ' Units sold as well as profit and loss will depend on each individual case
     ' Calculate profit/loss and find minimal p/l from right to left and from left to right
     ' Write a function that will return an index if where inventory sale will start
@@ -309,9 +297,11 @@ getArrayOfProfits = profitsArray
 
 End Function
 Function mergeAndSortArray(oldInventory() As String, newPurchase() As String) As String()
-
+Debug.Print "old Inv size " & UBound(oldInventory)
 If UBound(oldInventory) < 1 Then
-mergeAndSortArray = newPurchase
+    iInventoryFormulaString = convertArrayToString(newPurchase)
+    Debug.Print "There was no inventory so we just added the purchase: " & iInventoryFormulaString
+    mergeAndSortArray = newPurchase
 Exit Function
 End If
 
@@ -609,7 +599,7 @@ Debug.Print "Number of Symbols added to dictionary :" & accountSymbols.count
 End Sub
  
 Sub setIterVariables(i As Integer)
- trSymbol = Cells(i, 5).Value2  ' SYMBOL column
+    trSymbol = Cells(i, 5).Value2  ' SYMBOL column
     trAmount = Cells(i, 8).Value2
     trDescription = Cells(i, 3).Value2   ' DESCRIPTION column
     
@@ -851,20 +841,19 @@ buyToCover = InStr(description, "Cover")
 normalBuy = InStr(description, "Bought")
 normalSell = InStr(description, "Sold")
 
-trType = "CASH & OTHER"
+getTransactionType = "CASH & OTHER"
 
 If normalBuy > 0 Then
-    trType = "BUY"
+    getTransactionType = "BUY"
     If buyToCover > 0 Then
-        trType = "BUY TO COVER"
+        getTransactionType = "BUY TO COVER"
     End If
 End If
 If normalSell > 0 Then
-    trType = "SELL"
+    getTransactionType = "SELL"
     If sellShort > 0 Then
-        trType = "SELL SHORT"
+        getTransactionType = "SELL SHORT"
     End If
 End If
 
-getTransactionType = trType
 End Function
